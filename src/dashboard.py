@@ -5,7 +5,9 @@ from math import pi, sqrt, pow
 from typing import List
 import streamlit as st
 
-st.set_page_config(page_title="Paco", layout="wide")
+st.set_page_config(page_title="MiV P1", layout="wide")
+
+# Helper functions
 
 def distribute_sizes(real_size_col : pd.Series, total_rel_size : int):
     total_size = real_size_col.agg('sum')
@@ -66,9 +68,19 @@ if __name__ == "__main__":
 
     # Graph 2.1: Bar plot with source data
     bar_fig = px.bar(plot_df, x='Continent', y='Births in 2026 (M)')
+    bar_fig.update_traces(hovertemplate="Births in 2026 (M): %{y}")
 
     # Graph 2.2: Radar plot with source data
     radar_fig = px.line_polar(plot_df, r="Births in 2026 (M)", theta="Continent", line_close=True)
+    radar_fig.update_layout(
+        polar=dict(
+            bgcolor="#0E1117",
+            radialaxis=dict(
+                tickfont=dict(color="white")
+            )
+        )
+    )
+    radar_fig.update_traces(hovertemplate="Births in 2026 (M): %{r}")
     
     left, right = st.columns(2)
     with left:
