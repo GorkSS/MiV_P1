@@ -20,6 +20,10 @@ def treat_2026_dataset(filepath: str, total_bubble_size = 160):
 
     return plot_df
 
+def treat_evo_dataset(filepath: str):
+    evo_df = pd.read_csv(filepath)
+    return evo_df.drop(["2024", "2025"], axis=1)
+
 def distribute_sizes(real_size_col : pd.Series, total_rel_size : int):
     total_size = real_size_col.agg('sum')
     return real_size_col.apply(lambda s: int(total_rel_size * s / total_size))
@@ -100,21 +104,46 @@ def radar_plot(plot_df: pd.DataFrame):
 
     return radar_fig
 
+#   Graph 3: 3D
+def threed_plot(evo_df: pd.DataFrame, year: str):
+    new_df = evo_df.copy()
+    new_df["proportion"] = round(-((1 - (new_df[year] / new_df["2026"])) * 100), 2)
+    for col in ("2026", year):
+        new_df[col] = new_df[col] / 1000
+        print(new_df[col])
+    fig = px.bar(new_df,
+                 x='Continent',
+                 y=year,
+                 color="proportion",
+                 custom_data=["proportion"])
+    fig.update_traces(hovertemplate="Births in " + year + ": %{y} M<br>Increase of %{customdata[0]}% from 2026")
+
+    print(new_df["proportion"])
+
+    return fig
+
 if __name__ == "__main__":
     plot_df = treat_2026_dataset("data/global_births_full_data.csv")
+    evo_df = treat_evo_dataset("data/global_births_evolution.csv")
 
     left, right = st.columns(2)
     with left:
         st.plotly_chart(bubble_plot(plot_df))
     with right:
-        option = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
-        
-        match(option):
-            case GraphType.BAR.value:
-                fig = bar_plot(plot_df)
-            case GraphType.RADAR.value:
-                fig = radar_plot(plot_df)
-            case _:
-                fig = None
+        years =  evo_df.columns.to_list()
+        years.remove("Continent")
+        option = st.selectbox("", years)
+        st.plotly_chart(threed_plot(evo_df, option))
 
-        st.plotly_chart(fig)
+        ### OG RIGHT
+        # option = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
+        
+        # match(option):
+        #     case GraphType.BAR.value:
+        #         fig = bar_plot(plot_df)
+        #     case GraphType.RADAR.value:
+        #         fig = radar_plot(plot_df)
+        #     case _:
+        #         fig = None
+
+        # st.plotly_chart(fig)
