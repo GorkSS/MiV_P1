@@ -48,7 +48,7 @@ if __name__ == "__main__":
     bubble_fig.update_yaxes(title_text="", showticklabels=False, showgrid=False, zeroline=False)
     bubble_fig.update_xaxes(showgrid=False, zeroline=False)
 
-    # Trace 1: Original bubble plot with correct proportions
+    # Graph 1: Original bubble plot with correct proportions
     bubble_fig.add_trace(
         px.scatter(plot_df,
                     x='Continent',
@@ -64,67 +64,18 @@ if __name__ == "__main__":
 
     plotly_legend_config(bubble_fig, [True, True], ["Original chart", "Updated chart"])
 
-    fig = Figure()
-
-    # Trace 2: Bar plot with source data
+    # Graph 2.1: Bar plot with source data
     bar_fig = px.bar(plot_df, x='Continent', y='Births in 2026 (M)')
 
-    # Trace 3: Radar plot with source data
+    # Graph 2.2: Radar plot with source data
     radar_fig = px.line_polar(plot_df, r="Births in 2026 (M)", theta="Continent", line_close=True)
     
-    fig.add_trace(bar_fig.data[0])
-    fig.add_trace(radar_fig.data[0])
-
-    fig.update_traces(hovertemplate="Births in 2026 (M): %{y}",
-                  visible=False,
-                  selector=dict(type='scatterpolar'))
-
-    fig.update_layout(
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                active=0,
-                buttons=list([
-                    dict(
-                        args=[
-                                {"visible": [True, False],
-                                "x": [plot_df["Continent"]],
-                                "y": [plot_df["Births in 2026 (M)"]],
-                                "r": [],
-                                "theta": []},
-                                {"yaxis.showgrid": True,
-                                "yaxis.showticklabels": True}
-                            ],
-                        label="Bar Plot",
-                        method="update"
-                    ),
-                    dict(
-                        args=[
-                                {"visible": [False, True],
-                                "x": [],
-                                "y": [],
-                                "r": [plot_df["Births in 2026 (M)"]],
-                                "theta": [plot_df["Continent"]]},
-                                {"yaxis.showgrid": False,
-                                "yaxis.showticklabels": False}
-                            ],
-                        label="Radar Plot",
-                        method="update"
-                    )
-                ]),
-                pad={"r": 10, "t": 10},
-                showactive=True,
-                x=0,
-                xanchor="left",
-                y=1.15,
-                yanchor="top",
-            ),
-        ]
-    )
-
     left, right = st.columns(2)
     with left:
         st.plotly_chart(bubble_fig)
     with right:
-        st.plotly_chart(fig)
+        option = st.selectbox("", ("Bar", "Radar"))
+        if option == "Bar":
+            st.plotly_chart(bar_fig)
+        else:
+            st.plotly_chart(radar_fig)
