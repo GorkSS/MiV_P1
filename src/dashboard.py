@@ -188,18 +188,19 @@ if __name__ == "__main__":
         countries_df = pd.read_csv("data/global_births_countries.csv")
         countries_df = countries_df[countries_df["Continent"] == option_country]
         
-        left_donut, right_donut = st.columns(2)
 
-        with left_donut:
-            countries_df.sort_values("2026", ascending=False, inplace=True)
-            top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
-            top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:]["2026"].sum()]
-            donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
-            donut.update_layout(showlegend=False)
-            st.plotly_chart(donut, key="leftdonut")
+        countries_df.sort_values("2026", ascending=False, inplace=True)
+        top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
+        top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:]["2026"].sum()]
+        donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
 
-        with right_donut:
-            countries_df.sort_values(option_evo_plot, ascending=False, inplace=True)
-            top_countries_df = countries_df.iloc[:value][["Region", "Continent", option_evo_plot]]
-            top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:][option_evo_plot].sum()]
-            st.plotly_chart(px.pie(top_countries_df, values=option_evo_plot, names="Region", hole=0.3), key="rightdonut")
+        countries_df.sort_values(option_evo_plot, ascending=False, inplace=True)
+        top_countries_df = countries_df.iloc[:value][["Region", "Continent", option_evo_plot]]
+        top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:][option_evo_plot].sum()]
+
+        pie_fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
+        pie_fig.add_trace(donut.data[0], row=1, col=1)
+        pie_fig.add_trace(px.pie(top_countries_df, values=option_evo_plot, names="Region", hole=0.3).data[0],
+                          row=1, col=2)
+
+        st.plotly_chart(pie_fig)
