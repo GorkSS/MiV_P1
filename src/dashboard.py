@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 from plotly.graph_objects import Figure
+from plotly.subplots import make_subplots
 from math import pi, sqrt, pow, ceil, floor
 from typing import List
 from enum import Enum
@@ -107,8 +108,8 @@ def bar_plot(plot_df: pd.DataFrame):
     return bar_fig
 
 #       Graph 2.2: Radar plot with source data
-def radar_plot(plot_df: pd.DataFrame):
-    radar_fig = px.line_polar(plot_df, r="Births in 2026 (M)", theta="Continent", line_close=True)
+def radar_plot(plot_df: pd.DataFrame, r="Births in 2026 (M)", theta="Continent", hover="2026"):
+    radar_fig = px.line_polar(plot_df, r=r, theta=theta, line_close=True)
     radar_fig.update_layout(
         polar=dict(
             bgcolor="#0E1117",
@@ -117,7 +118,7 @@ def radar_plot(plot_df: pd.DataFrame):
             )
         )
     )
-    radar_fig.update_traces(hovertemplate="Births in 2026 (M): %{r}")
+    radar_fig.update_traces(hovertemplate="Births in " + hover + ": %{r}M")
 
     return radar_fig
 
@@ -150,10 +151,10 @@ if __name__ == "__main__":
     plot_df = treat_2026_dataset("data/global_births_full_data.csv")
     evo_df = treat_evo_dataset("data/global_births_evolution.csv")
 
-    left, right = st.columns(2)
-    with left:
+    r1left, r1right = st.columns(2)
+    with r1left:
         st.plotly_chart(bubble_plot(plot_df))
-    with right:
+    with r1right:
         _, btn, _ = st.columns(3)
         with btn:
             option_2026_plot = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
@@ -171,4 +172,34 @@ if __name__ == "__main__":
     years = evo_df.columns.to_list()
     years.remove("Continent")
     option_evo_plot = st.selectbox("", years)
-    st.plotly_chart(threed_plot(evo_df, option_evo_plot))
+
+    r2left, r2right = st.columns(2)
+    with r2left:
+        st.plotly_chart(threed_plot(evo_df, option_evo_plot))
+    with r2right:
+        country_btn, left_btn = st.columns(2)
+        with country_btn:
+            option_country = st.selectbox("Continent", plot_df["Continent"])
+        with left_btn:
+            _, n_countries_btn = st.columns(2)
+            with n_countries_btn:
+                value = st.number_input("Nº of countries", min_value=0, max_value=15, value=5, step=1)
+
+        countries_df = pd.read_csv("data/global_births_countries.csv")
+        countries_df = countries_df[countries_df["Continent"] == option_country]
+        
+        left_donut, right_donut = st.columns(2)
+
+        with left_donut:
+            countries_df.sort_values("2026", ascending=False, inplace=True)
+            top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
+            top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:]["2026"].sum()]
+            donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
+            donut.update_layout(showlegend=False)
+            st.plotly_chart(donut, key="leftdonut")
+
+        with right_donut:
+            countries_df.sort_values(option_evo_plot, ascending=False, inplace=True)
+            top_countries_df = countries_df.iloc[:value][["Region", "Continent", option_evo_plot]]
+            top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:][option_evo_plot].sum()]
+            st.plotly_chart(px.pie(top_countries_df, values=option_evo_plot, names="Region", hole=0.3), key="rightdonut")
