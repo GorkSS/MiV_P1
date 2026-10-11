@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.express as px
 from plotly.graph_objects import Figure
-from math import pi, sqrt, pow
+from math import pi, sqrt, pow, ceil, floor
 from typing import List
 from enum import Enum
 import streamlit as st
@@ -41,6 +41,23 @@ def plotly_legend_config(fig : Figure, visible_traces : List, labels : List):
                 labels_used += 1
     else:
         raise Exception(f"Number of values of visibility {len(visible_traces)} is not equal to number of traces {len(fig.data)}")
+
+def proportion_between_years(evo_df, reference_year, target_year):
+    return -((1 - (evo_df[target_year] / evo_df[reference_year])) * 100)
+
+def max_min_proportions(evo_df):
+    minimum = 0
+    maximum = 0
+    temp_series = None
+    for col in evo_df.columns:
+        if col != "Continent" and col != "2026":
+            temp_series = proportion_between_years(evo_df, "2026", col)
+            if temp_series.min() < minimum:
+                minimum = temp_series.min()
+            if temp_series.max() > maximum:
+                maximum = temp_series.max()
+
+    return [floor(minimum), ceil(maximum)]
 
 # Charts
 
@@ -107,18 +124,25 @@ def radar_plot(plot_df: pd.DataFrame):
 #   Graph 3: 3D
 def threed_plot(evo_df: pd.DataFrame, year: str):
     new_df = evo_df.copy()
-    new_df["proportion"] = round(-((1 - (new_df[year] / new_df["2026"])) * 100), 2)
+    new_df["proportion"] = round(proportion_between_years(new_df, "2026", year), 2)
     for col in ("2026", year):
         new_df[col] = new_df[col] / 1000
-        print(new_df[col])
     fig = px.bar(new_df,
                  x='Continent',
                  y=year,
                  color="proportion",
+                 range_color=[-45, 20],
                  custom_data=["proportion"])
     fig.update_traces(hovertemplate="Births in " + year + ": %{y} M<br>Increase of %{customdata[0]}% from 2026")
 
-    print(new_df["proportion"])
+    fig.update_layout(yaxis_title=f"Births in {year} (M)", coloraxis=dict(
+        colorscale=[
+            [0, "rgb(94 111 251)"],
+            [0.707, "rgb(237 239 240)"],
+            [1, "rgb(251 234 94)"]
+        ],
+        colorbar_title="Births increase (%)"
+    ))
 
     return fig
 
@@ -130,20 +154,21 @@ if __name__ == "__main__":
     with left:
         st.plotly_chart(bubble_plot(plot_df))
     with right:
-        years =  evo_df.columns.to_list()
-        years.remove("Continent")
-        option = st.selectbox("", years)
-        st.plotly_chart(threed_plot(evo_df, option))
-
-        ### OG RIGHT
-        # option = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
+        _, btn, _ = st.columns(3)
+        with btn:
+            option_2026_plot = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
         
-        # match(option):
-        #     case GraphType.BAR.value:
-        #         fig = bar_plot(plot_df)
-        #     case GraphType.RADAR.value:
-        #         fig = radar_plot(plot_df)
-        #     case _:
-        #         fig = None
+        match(option_2026_plot):
+            case GraphType.BAR.value:
+                fig = bar_plot(plot_df)
+            case GraphType.RADAR.value:
+                fig = radar_plot(plot_df)
+            case _:
+                fig = None
 
-        # st.plotly_chart(fig)
+        st.plotly_chart(fig)
+
+    years = evo_df.columns.to_list()
+    years.remove("Continent")
+    option_evo_plot = st.selectbox("", years)
+    st.plotly_chart(threed_plot(evo_df, option_evo_plot))
