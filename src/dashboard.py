@@ -73,7 +73,8 @@ def bubble_plot(plot_df: pd.DataFrame):
                     custom_data=["Births in 2026 (M)"]
                     )
     bubble_fig.update_traces(marker=dict(color='red'))
-    bubble_fig.update_layout(hovermode="x unified")
+    bubble_fig.update_layout(hovermode="x unified",
+                             title={"text": "Original plot proportions vs correct ones", "x": 0.25})
     bubble_fig.update_yaxes(title_text="", showticklabels=False, showgrid=False, zeroline=False)
     bubble_fig.update_xaxes(showgrid=False, zeroline=False)
 
@@ -102,7 +103,7 @@ class GraphType(Enum):
 
 #       Graph 2.1: Bar plot with source data
 def bar_plot(plot_df: pd.DataFrame):
-    bar_fig = px.bar(plot_df, x='Continent', y='Births in 2026 (M)')
+    bar_fig = px.bar(plot_df, x='Continent', y='Births in 2026 (M)', height=10)
     bar_fig.update_traces(hovertemplate="Births in 2026 (M): %{y}")
 
     return bar_fig
@@ -126,7 +127,7 @@ def radar_plot(plot_df: pd.DataFrame, r="Births in 2026 (M)", theta="Continent",
 def threed_plot(evo_df: pd.DataFrame, year: str):
     new_df = evo_df.copy()
     new_df["proportion"] = round(proportion_between_years(new_df, "2026", year), 2)
-    for col in ("2026", year):
+    for col in set(("2026", year)):
         new_df[col] = new_df[col] / 1000
     fig = px.bar(new_df,
                  x='Continent',
@@ -136,29 +137,36 @@ def threed_plot(evo_df: pd.DataFrame, year: str):
                  custom_data=["proportion"])
     fig.update_traces(hovertemplate="Births in " + year + ": %{y} M<br>Increase of %{customdata[0]}% from 2026")
 
-    fig.update_layout(yaxis_title=f"Births in {year} (M)", coloraxis=dict(
-        colorscale=[
-            [0, "rgb(94 111 251)"],
-            [0.707, "rgb(237 239 240)"],
-            [1, "rgb(251 234 94)"]
-        ],
-        colorbar_title="Births increase (%)"
-    ))
+    fig.update_layout(yaxis_title=f"Births in {year} (M)", 
+                      title={"text": f"Projected Total Births in {year} and Increase From 2026", "x": 0.1},
+                      coloraxis=dict(
+                      colorscale=[
+                          [0, "rgb(94 111 251)"],
+                          [0.707, "rgb(237 239 240)"],
+                          [1, "rgb(251 234 94)"]
+                      ],
+                      colorbar_title="Births increase (%)",
+                    ))
 
     return fig
 
 if __name__ == "__main__":
-    plot_df = treat_2026_dataset("data/global_births_full_data.csv")
+    plot_df = treat_2026_dataset("data/global_births_full_data.csv", total_bubble_size=90)
     evo_df = treat_evo_dataset("data/global_births_evolution.csv")
 
-    r1left, r1right = st.columns(2)
-    with r1left:
-        st.plotly_chart(bubble_plot(plot_df))
-    with r1right:
-        _, btn, _ = st.columns(3)
+    st.header("Projected Births Worldwide in 2026", text_alignment="center")
+    up_zone = st.container(border=True)
+
+    _, r0right = up_zone.columns(2)
+    with r0right:
+        _, _, _, _, btn = r0right.columns(5)
         with btn:
             option_2026_plot = st.selectbox("", (GraphType.BAR.value, GraphType.RADAR.value))
-        
+
+    r1left, r1right = up_zone.columns(2)
+    with r1left:
+        st.plotly_chart(bubble_plot(plot_df), height=350)
+    with r1right:
         match(option_2026_plot):
             case GraphType.BAR.value:
                 fig = bar_plot(plot_df)
@@ -167,13 +175,19 @@ if __name__ == "__main__":
             case _:
                 fig = None
 
-        st.plotly_chart(fig)
+        fig.update_layout(title={"text": "Births in 2026 by continent", "x": 0.35})
+        st.plotly_chart(fig, height=350)
+
+
+
+    st.header("UN Data for Projected Births Worldwide 2026-2100", text_alignment="center")
+    bottom_zone = st.container(border=True)
 
     years = evo_df.columns.to_list()
     years.remove("Continent")
-    option_evo_plot = st.selectbox("", years)
+    option_evo_plot = bottom_zone.selectbox("", years)
 
-    r2left, r2right = st.columns(2)
+    r2left, r2right = bottom_zone.columns(2)
     with r2left:
         st.plotly_chart(threed_plot(evo_df, option_evo_plot))
     with r2right:
@@ -181,14 +195,11 @@ if __name__ == "__main__":
         with country_btn:
             option_country = st.selectbox("Continent", plot_df["Continent"])
         with left_btn:
-            _, n_countries_btn = st.columns(2)
-            with n_countries_btn:
-                value = st.number_input("Nº of countries", min_value=0, max_value=15, value=5, step=1)
+            value = st.number_input("Nº of countries", min_value=1, max_value=15, value=5, step=1)
 
         countries_df = pd.read_csv("data/global_births_countries.csv")
         countries_df = countries_df[countries_df["Continent"] == option_country]
         
-
         countries_df.sort_values("2026", ascending=False, inplace=True)
         top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
         top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:]["2026"].sum()]
@@ -203,4 +214,24 @@ if __name__ == "__main__":
         pie_fig.add_trace(px.pie(top_countries_df, values=option_evo_plot, names="Region", hole=0.3).data[0],
                           row=1, col=2)
 
-        st.plotly_chart(pie_fig)
+        pie_fig.add_annotation(
+            x=0.17,
+            y=0,
+            text="2026",
+            showarrow=False,
+            xref="paper",
+            yref="paper"
+        )
+
+        pie_fig.add_annotation(
+            x=0.83,
+            y=0,
+            text=option_evo_plot,
+            showarrow=False,
+            xref="paper",
+            yref="paper"
+        )
+
+        pie_fig.update_layout(title={"text": f"% of Births by Country in {option_country}", "x": 0.25})
+
+        st.plotly_chart(pie_fig, height="content")
