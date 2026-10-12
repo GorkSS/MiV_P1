@@ -1,13 +1,13 @@
 import pandas as pd
 import plotly.express as px
-from plotly.graph_objects import Figure
+from plotly.graph_objects import Figure, Scatter
 from plotly.subplots import make_subplots
 from math import pi, sqrt, pow, ceil, floor
 from typing import List
 from enum import Enum
 import streamlit as st
 
-st.set_page_config(page_title="MiV P1", layout="wide")
+st.set_page_config(page_title="MiV P1", page_icon="img/favicon.png", layout="wide")
 
 # Helper functions
 
@@ -124,21 +124,24 @@ def radar_plot(plot_df: pd.DataFrame, r="Births in 2026 (M)", theta="Continent",
     return radar_fig
 
 #   Graph 3: 3D
-def threed_plot(evo_df: pd.DataFrame, year: str):
+def threed_plot(evo_df: pd.DataFrame, year: str, show_trace: bool):
     new_df = evo_df.copy()
     new_df["proportion"] = round(proportion_between_years(new_df, "2026", year), 2)
     for col in set(("2026", year)):
         new_df[col] = new_df[col] / 1000
+
+    new_df["total_increase"] = round((new_df["proportion"] / 100) * new_df["2026"], 2)
     fig = px.bar(new_df,
                  x='Continent',
                  y=year,
+                 range_y=[0, 75],
                  color="proportion",
                  range_color=[-45, 20],
-                 custom_data=["proportion"])
-    fig.update_traces(hovertemplate="Births in " + year + ": %{y} M<br>Increase of %{customdata[0]}% from 2026")
+                 custom_data=["proportion", "total_increase"])
+    fig.update_traces(hovertemplate="Births in " + year + ": %{y} M<br>Increase of %{customdata[0]}% (%{customdata[1]}M) from 2026")
 
     fig.update_layout(yaxis_title=f"Births in {year} (M)", 
-                      title={"text": f"Projected Total Births in {year} and Increase From 2026", "x": 0.1},
+                      title={"text": f"Projected Total Births in {year} and Births Increase Since 2026", "x": 0.05},
                       coloraxis=dict(
                       colorscale=[
                           [0, "rgb(94 111 251)"],
@@ -148,10 +151,24 @@ def threed_plot(evo_df: pd.DataFrame, year: str):
                       colorbar_title="Births increase (%)",
                     ))
 
+    if show_trace:
+        marker = Scatter(x=new_df["Continent"],
+                            y=new_df["2026"],
+                            mode="markers",
+                            marker=dict(color="#d02f69", symbol="x", size=10),
+                            name="2026",
+                            showlegend=False,
+                            hovertemplate="%{y}M")
+        
+        fig.add_trace(marker)
+
     return fig
 
+def return_source_text(href, text):
+    return f"<p align='center' style='font-size: 12px'>Source: <a href={href}>{text}</a>"
+
 if __name__ == "__main__":
-    plot_df = treat_2026_dataset("data/global_births_full_data.csv", total_bubble_size=90)
+    plot_df = treat_2026_dataset("data/global_births_full_data.csv", total_bubble_size=85)
     evo_df = treat_evo_dataset("data/global_births_evolution.csv")
 
     st.header("Projected Births Worldwide in 2026", text_alignment="center")
@@ -179,35 +196,38 @@ if __name__ == "__main__":
         st.plotly_chart(fig, height=350)
 
 
-
     st.header("UN Data for Projected Births Worldwide 2026-2100", text_alignment="center")
     bottom_zone = st.container(border=True)
 
     years = evo_df.columns.to_list()
     years.remove("Continent")
-    option_evo_plot = bottom_zone.selectbox("", years)
+    option_evo_plot = str(bottom_zone.number_input("", min_value=2026, max_value=2100, value=2026, step=1))
 
     r2left, r2right = bottom_zone.columns(2)
     with r2left:
-        st.plotly_chart(threed_plot(evo_df, option_evo_plot))
+        toggle_reference_point = st.toggle("Show 2026 reference point", "")
+        st.plotly_chart(threed_plot(evo_df, option_evo_plot, toggle_reference_point))
     with r2right:
         country_btn, left_btn = st.columns(2)
         with country_btn:
-            option_country = st.selectbox("Continent", plot_df["Continent"])
+            option_continent = st.selectbox("Continent", plot_df["Continent"])
         with left_btn:
-            value = st.number_input("Nº of countries", min_value=1, max_value=15, value=5, step=1)
+            value = st.number_input("Nº of countries", min_value=1, max_value=12, value=5, step=1)
 
         countries_df = pd.read_csv("data/global_births_countries.csv")
-        countries_df = countries_df[countries_df["Continent"] == option_country]
+        countries_df = countries_df[countries_df["Continent"] == option_continent]
+
+        for col in set(("2026", option_evo_plot)):
+            countries_df[col] = countries_df[col] / 1000
         
         countries_df.sort_values("2026", ascending=False, inplace=True)
         top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
-        top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:]["2026"].sum()]
+        top_countries_df.loc[len(top_countries_df)] = ["Other", option_continent, countries_df.iloc[value:]["2026"].sum()]
         donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
 
         countries_df.sort_values(option_evo_plot, ascending=False, inplace=True)
         top_countries_df = countries_df.iloc[:value][["Region", "Continent", option_evo_plot]]
-        top_countries_df.loc[len(top_countries_df)] = ["Other", option_country, countries_df.iloc[value:][option_evo_plot].sum()]
+        top_countries_df.loc[len(top_countries_df)] = ["Other", option_continent, countries_df.iloc[value:][option_evo_plot].sum()]
 
         pie_fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
         pie_fig.add_trace(donut.data[0], row=1, col=1)
@@ -232,6 +252,11 @@ if __name__ == "__main__":
             yref="paper"
         )
 
-        pie_fig.update_layout(title={"text": f"% of Births by Country in {option_country}", "x": 0.25})
+        pie_fig.update_layout(title={"text": f"% of Births by Country in {option_continent}", "x": 0.25})
+        pie_fig.update_traces(hovertemplate="%{value} M in %{label}")
 
         st.plotly_chart(pie_fig, height="content")
+
+    st.html("<br><p align='center' style='font-size: 14px'><b>Sources</b>: " \
+            "<a href=https://worldvisualized.com/article/asia-and-africa-account-for-nearly-85-of-global-births-in-2026>World Visualized</a> " \
+            "and <a href=https://population.un.org/wpp/downloads?folder=Probabilistic%20Projections&group=Fertility>UN World Population Prospects 2024</a>")
