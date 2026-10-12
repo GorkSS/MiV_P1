@@ -110,7 +110,7 @@ def bar_plot(plot_df: pd.DataFrame):
 
 #       Graph 2.2: Radar plot with source data
 def radar_plot(plot_df: pd.DataFrame, r="Births in 2026 (M)", theta="Continent", hover="2026"):
-    radar_fig = px.line_polar(plot_df, r=r, theta=theta, line_close=True)
+    radar_fig = px.line_polar(plot_df, r=r, theta=theta, line_close=True, range_r=[0, 70])
     radar_fig.update_layout(
         polar=dict(
             bgcolor="#0E1117",
@@ -164,8 +164,50 @@ def threed_plot(evo_df: pd.DataFrame, year: str, show_trace: bool):
 
     return fig
 
-def return_source_text(href, text):
-    return f"<p align='center' style='font-size: 12px'>Source: <a href={href}>{text}</a>"
+#   Graph 4: Donut plots
+def donut_plots(year2plot: str, selected_continent: str, n_countries_on_plot: int):
+    countries_df = pd.read_csv("data/global_births_countries.csv")
+    countries_df = countries_df[countries_df["Continent"] == selected_continent]
+
+    for col in set(("2026", year2plot)):
+        countries_df[col] = countries_df[col] / 1000
+    
+    countries_df.sort_values("2026", ascending=False, inplace=True)
+    top_countries_df = countries_df.iloc[:n_countries_on_plot][["Region", "Continent", "2026"]]
+    top_countries_df.loc[len(top_countries_df)] = ["Other", selected_continent, countries_df.iloc[n_countries_on_plot:]["2026"].sum()]
+    donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
+
+    countries_df.sort_values(year2plot, ascending=False, inplace=True)
+    top_countries_df = countries_df.iloc[:n_countries_on_plot][["Region", "Continent", year2plot]]
+    top_countries_df.loc[len(top_countries_df)] = ["Other", selected_continent, countries_df.iloc[n_countries_on_plot:][year2plot].sum()]
+
+    pie_fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
+    pie_fig.add_trace(donut.data[0], row=1, col=1)
+    pie_fig.add_trace(px.pie(top_countries_df, values=year2plot, names="Region", hole=0.3).data[0],
+                        row=1, col=2)
+
+    pie_fig.add_annotation(
+        x=0.17,
+        y=0,
+        text="2026",
+        showarrow=False,
+        xref="paper",
+        yref="paper"
+    )
+
+    pie_fig.add_annotation(
+        x=0.83,
+        y=0,
+        text=option_evo_plot,
+        showarrow=False,
+        xref="paper",
+        yref="paper"
+    )
+
+    pie_fig.update_layout(title={"text": f"% of Births by Country in {selected_continent}", "x": 0.25})
+    pie_fig.update_traces(hovertemplate="%{value} M births in %{label}")
+
+    return pie_fig
 
 if __name__ == "__main__":
     plot_df = treat_2026_dataset("data/global_births_full_data.csv", total_bubble_size=85)
@@ -201,59 +243,20 @@ if __name__ == "__main__":
 
     years = evo_df.columns.to_list()
     years.remove("Continent")
-    option_evo_plot = str(bottom_zone.number_input("", min_value=2026, max_value=2100, value=2026, step=1))
+    option_evo_plot = str(bottom_zone.number_input("Show Projected Births in:", min_value=2027, max_value=2100, value=2027, step=1))
 
     r2left, r2right = bottom_zone.columns(2)
     with r2left:
-        toggle_reference_point = st.toggle("Show 2026 reference point", "")
+        toggle_reference_point = st.toggle("Show 2026 reference points", "")
         st.plotly_chart(threed_plot(evo_df, option_evo_plot, toggle_reference_point))
     with r2right:
         country_btn, left_btn = st.columns(2)
         with country_btn:
             option_continent = st.selectbox("Continent", plot_df["Continent"])
         with left_btn:
-            value = st.number_input("Nº of countries", min_value=1, max_value=12, value=5, step=1)
+            value = st.number_input("Nº of countries", min_value=1, max_value=10, value=5, step=1)
 
-        countries_df = pd.read_csv("data/global_births_countries.csv")
-        countries_df = countries_df[countries_df["Continent"] == option_continent]
-
-        for col in set(("2026", option_evo_plot)):
-            countries_df[col] = countries_df[col] / 1000
-        
-        countries_df.sort_values("2026", ascending=False, inplace=True)
-        top_countries_df = countries_df.iloc[:value][["Region", "Continent", "2026"]]
-        top_countries_df.loc[len(top_countries_df)] = ["Other", option_continent, countries_df.iloc[value:]["2026"].sum()]
-        donut = px.pie(top_countries_df, values="2026", names="Region", hole=0.3)
-
-        countries_df.sort_values(option_evo_plot, ascending=False, inplace=True)
-        top_countries_df = countries_df.iloc[:value][["Region", "Continent", option_evo_plot]]
-        top_countries_df.loc[len(top_countries_df)] = ["Other", option_continent, countries_df.iloc[value:][option_evo_plot].sum()]
-
-        pie_fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
-        pie_fig.add_trace(donut.data[0], row=1, col=1)
-        pie_fig.add_trace(px.pie(top_countries_df, values=option_evo_plot, names="Region", hole=0.3).data[0],
-                          row=1, col=2)
-
-        pie_fig.add_annotation(
-            x=0.17,
-            y=0,
-            text="2026",
-            showarrow=False,
-            xref="paper",
-            yref="paper"
-        )
-
-        pie_fig.add_annotation(
-            x=0.83,
-            y=0,
-            text=option_evo_plot,
-            showarrow=False,
-            xref="paper",
-            yref="paper"
-        )
-
-        pie_fig.update_layout(title={"text": f"% of Births by Country in {option_continent}", "x": 0.25})
-        pie_fig.update_traces(hovertemplate="%{value} M in %{label}")
+        pie_fig = donut_plots(option_evo_plot, option_continent, value)
 
         st.plotly_chart(pie_fig, height="content")
 
